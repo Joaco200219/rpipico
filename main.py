@@ -6,9 +6,9 @@ import uasyncio as asyncio
 import dht, machine
 import json
 
-
 led_interno = machine.Pin("LED", machine.Pin.OUT)
 d = dht.DHT22(machine.Pin(15))
+rele_pin = machine.Pin(14, machine.Pin.OUT, value=1)
 
 DB_FILE = "midb.json"
 db_cache = {}
@@ -34,7 +34,7 @@ def set_db(key, val):
         json.dump(db_cache, f)
 
 async def parpadear():
-    for _ in range(5):  # Destella 5 veces (2.5 segundos en total)
+    for _ in range(5):  # Destella 5 veces 
         led_interno.on()
         await asyncio.sleep(0.25)
         led_interno.off()
@@ -45,10 +45,13 @@ async def messages(client):  # Quitamos 'datos'
         comando = topic.decode().split('/')[-1]
         val = msg.decode()
         
-        # 1. Guardar SOLO los parámetros permitidos en la BD no volátil
-        if comando in ["setpoint", "periodo", "modo", "rele"]:
-            set_db(comando, val)
-            print(f"Guardado en BD {comando}: {val}")
+        # Por si manda otras cosas
+        if comando in ["setpoint", "periodo", "modo", "rele"]: 
+            if comando == "rele": # Si es rele, tiene que estar en manual para cambiar sino nada
+                
+            else :
+                set_db(comando, val)
+                print(f"Guardado en BD {comando}: {val}")
 
         # 2. Ejecutar acciones que NO se guardan en la BD
         if comando == "destello":
@@ -87,7 +90,7 @@ async def main(client):
                 humedad=d.humidity()
             except OSError as e:
                 print("sin sensor humedad")
-
+            
             datos = {
                 "temp": d.temperature(),
                 "hum": d.humidity(),
@@ -96,8 +99,10 @@ async def main(client):
                 "rele": int(get_db("rele", 1)),
                 "periodo": int(get_db("periodo", 20))
             }
-
-            json_datos = json.dumps(datos)
+            #Para que no publique rele
+            excluir = {"rele"}
+            diccionario = {k, v for k, v in datos.items() if k not in excluir}
+            json_datos = json.dumps(diccionario) 
             id_dispositivo = "28:cd:c1:04:d8:a7"
             await client.publish(f"{id_dispositivo}/", json_datos, qos=1)    
             print("Publicado:", json_datos)
