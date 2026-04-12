@@ -48,7 +48,9 @@ async def messages(client):  # Quitamos 'datos'
         # Por si manda otras cosas
         if comando in ["setpoint", "periodo", "modo", "rele"]: 
             if comando == "rele": # Si es rele, tiene que estar en manual para cambiar sino nada
-                
+                modo_trabajo = get_db("modo", "auto") # Leo el modo almacenado en la base de datos
+                if modo_trabajo == "manual":  # Si se cumple guarda el valor solicitado en BDD
+                    set_db(comando, val) 
             else :
                 set_db(comando, val)
                 print(f"Guardado en BD {comando}: {val}")
@@ -101,12 +103,21 @@ async def main(client):
             }
             #Para que no publique rele
             excluir = {"rele"}
-            diccionario = {k, v for k, v in datos.items() if k not in excluir}
+            diccionario = {k: v for k, v in datos.items() if k not in excluir}
+            
+            # Publica
             json_datos = json.dumps(diccionario) 
             id_dispositivo = "28:cd:c1:04:d8:a7"
             await client.publish(f"{id_dispositivo}/", json_datos, qos=1)    
             print("Publicado:", json_datos)
+            
+            # Si es modo auto, supera setpoint y activa el pin
+            if (datos["modo"] == "auto"):
+                datos["rele"] = 0 if (datos["temp"] > datos["setpoint"]) else 1
+                set_db("rele", datos["rele"]) # Guarda cambio
 
+            rele_pin.value(datos["rele"]) 
+        
         except OSError as e:
             print("sin sensor")
         await asyncio.sleep(datos["periodo"])  # Broker is slow
