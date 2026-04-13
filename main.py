@@ -8,7 +8,7 @@ import json
 
 led_interno = machine.Pin("LED", machine.Pin.OUT)
 d = dht.DHT22(machine.Pin(15))
-rele_pin = machine.Pin(14, machine.Pin.OUT, value=1)
+rele_pin = machine.Pin(10, machine.Pin.OUT, value=1)
 
 DB_FILE = "midb.json"
 db_cache = {}
@@ -44,16 +44,21 @@ async def messages(client):  # Quitamos 'datos'
     async for topic, msg, retained in client.queue:
         comando = topic.decode().split('/')[-1]
         val = msg.decode()
-        
+        invalido = False
+
         # Por si manda otras cosas
         if comando in ["setpoint", "periodo", "modo", "rele"]: 
             if comando == "rele": # Si es rele, tiene que estar en manual para cambiar sino nada
                 modo_trabajo = get_db("modo", "auto") # Leo el modo almacenado en la base de datos
-                if modo_trabajo == "manual":  # Si se cumple guarda el valor solicitado en BDD
+                if (modo_trabajo == "manual") and (val in [0,1]):  # Si se cumple guarda el valor solicitado en BDD
                     set_db(comando, val) 
-            else :
+            
+            if (comando == "modo") and (val in ["auto", "manual"]):
                 set_db(comando, val)
                 print(f"Guardado en BD {comando}: {val}")
+            
+                
+
 
         # 2. Ejecutar acciones que NO se guardan en la BD
         if comando == "destello":
