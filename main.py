@@ -9,7 +9,7 @@ import json
 led_interno = machine.Pin("LED", machine.Pin.OUT)
 d = dht.DHT22(machine.Pin(15))
 rele_pin = machine.Pin(10, machine.Pin.OUT, value=1)
-
+id_dispositivo = "28:cd:c1:04:d8:a7"
 DB_FILE = "midb.json"
 db_cache = {}
 
@@ -44,26 +44,37 @@ async def messages(client):  # Quitamos 'datos'
     async for topic, msg, retained in client.queue:
         comando = topic.decode().split('/')[-1]
         val = msg.decode()
-        invalido = False
-
-        # Por si manda otras cosas
-        if comando in ["setpoint", "periodo", "modo", "rele"]: 
-            if comando == "rele": # Si es rele, tiene que estar en manual para cambiar sino nada
-                modo_trabajo = get_db("modo", "auto") # Leo el modo almacenado en la base de datos
-                if (modo_trabajo == "manual") and (val in [0,1]):  # Si se cumple guarda el valor solicitado en BDD
-                    set_db(comando, val) 
-            
-            if (comando == "modo") and (val in ["auto", "manual"]):
-                set_db(comando, val)
-                print(f"Guardado en BD {comando}: {val}")
-            
-                
-
 
         # 2. Ejecutar acciones que NO se guardan en la BD
         if comando == "destello":
             asyncio.create_task(parpadear())
             print("Acción: Destellando...")
+            continue  
+        elif comando == "rele":
+            modo_trabajo = get_db("modo", "auto")
+            if modo_trabajo == "manual" and val in ["0", "1"]:
+                set_db(comando, int(val))
+            else:
+                await client.publish(f"{id_dispositivo}/", f"Error: Rele requiere modo manual y val 0 o 1. Modo: {modo_trabajo}, Val: {val}", qos=1)
+        elif comando == "modo":
+            if val in ["auto", "manual"]:
+                set_db(comando, val)
+            else:
+                await client.publish(f"{id_dispositivo}/", f"Error: Modo debe ser 'auto' o 'manual'. Val: {val}", qos=1)
+        elif comando == "periodo":
+            if val.isdigit() and int(val) > 0:
+                set_db(comando, int(val))
+            else:
+                await client.publish(f"{id_dispositivo}/", f"Error: Periodo debe ser un número entero positivo. Val: {val}", qos=1)
+        elif comando == "setpoint":
+            try:
+                set_db(comando, float(val))
+            except ValueError:
+                await client.publish(f"{id_dispositivo}/", f"Error: Setpoint debe ser numérico. Val: {val}", qos=1)
+        # 3. Comando no reconocido
+        else:
+            await client.publish(f"{id_dispositivo}/", f"Error: Comando no reconocido. Val: {comando}", qos=1)
+        
         
 
 async def up(client):
@@ -97,10 +108,9 @@ async def main(client):
                 humedad=d.humidity()
             except OSError as e:
                 print("sin sensor humedad")
-            
             datos = {
-                "temp": d.temperature(),
-                "hum": d.humidity(),
+                "temp": temperatura,
+                "hum": humedad,
                 "setpoint": float(get_db("setpoint", 24.0)),
                 "modo": get_db("modo", "auto"),
                 "rele": int(get_db("rele", 1)),
@@ -112,7 +122,7 @@ async def main(client):
             
             # Publica
             json_datos = json.dumps(diccionario) 
-            id_dispositivo = "28:cd:c1:04:d8:a7"
+
             await client.publish(f"{id_dispositivo}/", json_datos, qos=1)    
             print("Publicado:", json_datos)
             
