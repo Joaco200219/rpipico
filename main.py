@@ -8,7 +8,7 @@ import json
 
 led_interno = machine.Pin("LED", machine.Pin.OUT)
 d = dht.DHT22(machine.Pin(15))
-rele_pin = machine.Pin(10, machine.Pin.OUT, value=1)
+rele_pin = machine.Pin(10, machine.Pin.OUT, value=1) #GP10
 id_dispositivo = "28:cd:c1:04:d8:a7"
 DB_FILE = "midb.json"
 db_cache = {}
