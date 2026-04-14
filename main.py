@@ -71,9 +71,6 @@ async def messages(client):  # Quitamos 'datos'
                 set_db(comando, float(val))
             except ValueError:
                 await client.publish(f"{id_dispositivo}/", f"Error: Setpoint debe ser numérico. Val: {val}", qos=1)
-        # 3. Comando no reconocido
-        else:
-            await client.publish(f"{id_dispositivo}/", f"Error: Comando no reconocido. Val: {comando}", qos=1)
         
         
 
